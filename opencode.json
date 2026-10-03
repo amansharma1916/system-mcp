@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "linux-system": {
+      "type": "local",
+      "command": [
+        "/home/aman/Projects/system-mcp/.venv/bin/python",
+        "/home/aman/Projects/system-mcp/server.py"
+      ],
+      "environment": {
+        "LINUX_MCP_CONFIG": "/home/aman/.config/linux-mcp/config.yaml"
+      },
+      "enabled": true
+    }
+  }
+}

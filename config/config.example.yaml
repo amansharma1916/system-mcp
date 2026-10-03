@@ -1,0 +1,165 @@
+# Example configuration for the Linux system MCP server.
+#
+# Copy this file to your own configuration location and edit it:
+#
+#     mkdir -p ~/.config/linux-mcp
+#     cp config/config.example.yaml ~/.config/linux-mcp/config.yaml
+#     $EDITOR ~/.config/linux-mcp/config.yaml
+#
+# The server finds configuration in this order:
+#   1. the --config PATH command line option
+#   2. the file named by the LINUX_MCP_CONFIG environment variable
+#   3. config/config.yaml next to this repository
+#   4. ~/.config/linux-mcp/config.yaml
+#
+# Validation is strict and failure is fatal: a typo, an unknown key, or a
+# configuration in which every directory is missing stops the server instead of
+# starting it with a weaker policy. Run `python server.py --check` to validate.
+
+# --------------------------------------------------------------------------- #
+# Policy: which tiers may run, and which need a human to approve each call.
+#
+# Tiers, in ascending severity:
+#   readonly     inspect only; nothing on the system changes
+#   write        create, edit, move, copy, or trash files you can write to
+#   system       change system or session state (for example kill_process)
+#   destructive  irreversible or arbitrary execution (delete_path, run_command,
+#                run_shell, force_kill_process)
+#
+# A tool's tier is decided by its name. A tool in `confirm_tiers` opens a
+# desktop dialog showing the exact action; if no dialog can be shown the action
+# is REFUSED (it never fails open).
+#
+# The defaults below are deliberately conservative: `destructive` is left out of
+# `enabled_tiers`, so run_command and run_shell cannot run at all until you add
+# it. Add it only if you want the model to be able to run arbitrary commands.
+# --------------------------------------------------------------------------- #
+policy:
+  enabled_tiers:
+    - readonly
+    - write
+    # - system        # uncomment to allow kill_process, settings, packages
+    # - destructive   # uncomment to allow run_command, run_shell, delete_path
+  confirm_tiers:
+    - system
+    - destructive
+  approval:
+    mechanism: zenity        # the only implemented mechanism
+    timeout_seconds: 60      # an unanswered dialog is treated as Deny
+    remember_for_seconds: 0  # 0 = ask every time; strongly recommended
+  audit:
+    enabled: true
+    path: ~/.local/state/linux-mcp/audit.jsonl
+    max_bytes: 10485760      # rotate to audit.jsonl.1 past this size
+  limits:
+    default_timeout_seconds: 30
+    max_timeout_seconds: 600
+    kill_grace_seconds: 3
+    max_output_bytes: 100000 # per stream, per command
+    max_read_bytes: 1000000  # per read_file call
+    rate_limit_per_minute: 60
+
+# --------------------------------------------------------------------------- #
+# Directories. `directories.allow` is the legacy form and still works: when the
+# `filesystem` section is absent it supplies BOTH the read and write allowlists.
+#
+# With the `filesystem` section present, `read_allow` is what the model may
+# inspect and `write_allow` is what it may change. `write_allow` must be a
+# subset of `read_allow`; keep it as narrow as you can live with. Note that
+# `write_allow` includes delete_path, so it is the boundary that matters most.
+# --------------------------------------------------------------------------- #
+directories:
+  allow:
+    - ~/Documents
+    - ~/Downloads
+    - ~/Projects
+  max_entries: 500
+
+# filesystem:
+#   read_allow:
+#     - ~/Documents
+#     - ~/Downloads
+#     - ~/Projects
+#   write_allow:            # subset of read_allow
+#     - ~/Downloads
+#     - ~/Projects
+#   follow_symlinks: false
+
+# --------------------------------------------------------------------------- #
+# Command execution. Both tools are tier `destructive`, so they also require the
+# destructive tier to be enabled above AND per-call approval.
+#
+# Containment runs each command in its own systemd user scope with memory and
+# CPU caps and a guaranteed whole-tree kill. If `systemd-run` is missing the
+# call fails closed rather than running uncontained; set `containment: none`
+# only if you accept that trade.
+#
+# `allow_pkexec` lets a tool raise a real polkit password prompt for privileged
+# work. The server never stores or caches a password and still refuses to run as
+# root itself.
+# --------------------------------------------------------------------------- #
+commands:
+  run_command_enabled: true
+  run_shell_enabled: true
+  containment: systemd-scope
+  containment_memory_max_bytes: 2147483648
+  containment_cpu_quota: "200%"
+  allow_pkexec: true
+
+# --------------------------------------------------------------------------- #
+# Phase 2 and 3 sections. Parsed and validated now; the tools that use them
+# arrive in later phases. Any unknown key in these sections is fatal.
+# --------------------------------------------------------------------------- #
+web:
+  enabled: true
+  search_provider: duckduckgo   # no API key required
+  max_fetch_bytes: 2000000
+
+packages:
+  backend: pacman               # pacman | yay | flatpak
+  use_pkexec: true
+
+power:
+  allow:
+    - lock
+    - logout
+    - suspend
+    # - hibernate
+    # - shutdown
+    # - reboot
+
+# --------------------------------------------------------------------------- #
+# Applications the AI may launch with open_application.
+# --------------------------------------------------------------------------- #
+applications:
+  allow:
+    code:
+      command: code
+      description: Visual Studio Code
+    brave:
+      command: brave
+      description: Brave Browser
+    firefox:
+      command: firefox
+      description: Firefox
+    terminal:
+      command: gnome-terminal
+      description: GNOME Terminal
+    files:
+      command: nautilus
+      description: GNOME Files
+
+    # Other desktop environments: replace the two entries above, for example
+    #   terminal: {command: konsole, description: KDE Terminal}
+    #   files:    {command: dolphin, description: KDE Dolphin}
+    #   terminal: {command: xterm, description: X Terminal}
+    #   files:    {command: thunar, description: Xfce File Manager}
+
+    # An entry whose executable cannot be found stays allowlisted but is marked
+    # unavailable, so the model receives "cannot be launched: ..." instead of
+    # "unknown application". Set `enabled: false` to keep a name listed in the
+    # configuration while refusing to launch it.
+    #   editor:
+    #     command: /usr/bin/nano
+    #     description: Nano editor
+    #     enabled: false

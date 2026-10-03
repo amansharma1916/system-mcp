@@ -1,0 +1,9 @@
+# Development dependencies (tests). Install with:
+#
+#   .venv/bin/pip install -r requirements-dev.txt
+#
+# anyio (and its pytest plugin, used for the in-process MCP client tests) comes
+# in with the MCP SDK, so pytest is the only addition.
+
+-r requirements.txt
+pytest>=8.0

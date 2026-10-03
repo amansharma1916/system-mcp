@@ -1,0 +1,16 @@
+# Runtime dependencies for the Linux system MCP server.
+#
+# Install into a virtual environment (Arch/EndeavourOS system Python is
+# externally managed and must not be written to):
+#
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+
+# MCP Python SDK, v2 line. It provides MCPServer over STDIO and, importantly for
+# this project, serves handshake-era clients (protocolVersion 2025-06-18 and
+# earlier) such as Gemini CLI and Cline without extra configuration.
+mcp>=2.2,<3
+
+# Reads config/config.yaml. YAML keeps the configuration readable and matches the
+# documented example format.
+PyYAML>=6.0
